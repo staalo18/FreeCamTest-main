@@ -24,13 +24,11 @@ namespace Hooks
 		if (cameraManager.GetFreeCameraToggled()) {
 			// triggered by camera manager
 log::info("FCSE - {}: Activating Free Camera via camera manager", __func__);
-			cameraManager.Activate(true);
+			cameraManager.SetActive(true);
 		} else {
 			// triggered by console command
-			// already in free camera mode, so just detach from target if any
 log::info("FCSE - {}: Activating Free Camera via console command", __func__);
-			cameraManager.Activate(false);
-			cameraManager.DetachTarget();
+			cameraManager.SetActive(false);
 		}
 
 		cameraManager.SetFreeCameraToggled(false);
@@ -42,14 +40,14 @@ log::info("FCSE - {}: Activating Free Camera via console command", __func__);
 		auto& cameraManager = FCSE::FreeCameraManager::GetSingleton();
 
 		if (cameraManager.GetFreeCameraToggled()) {
-			cameraManager.Activate(false);
+			cameraManager.SetActive(false);
 log::info("FCSE - {}: De-Activating Free Camera via camera manager", __func__);
 		} else {
 			if (cameraManager.IsActive()) {
-				cameraManager.Activate(false);
+				cameraManager.SetActive(false);
 //				RE::PlayerCamera::GetSingleton()->ToggleFreeCameraMode(false);
 			}
-//			cameraManager.Activate(false);
+//			cameraManager.SetActive(false);
 			// triggered by console command
 log::info("FCSE - {}: De-Activating Free Camera via console command", __func__);
 		}
@@ -118,6 +116,6 @@ log::info("FCSE - {}: ToggleFreeCameraMode called, freezeTime={}", __func__, a_f
         }
   */  
         // Call original function
-        _ToggleFreeCameraMode(a_this, a_freezeTime);
+//        _ToggleFreeCameraMode(a_this, a_freezeTime);
     }
 } // namespace Hooks

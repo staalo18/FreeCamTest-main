@@ -49,7 +49,7 @@ namespace Hooks
         {
             REL::Relocation<std::uintptr_t> hook{ RELOCATION_ID(49876, 50809) };
             auto& trampoline = SKSE::GetTrampoline();
-            _ToggleFreeCameraMode = trampoline.write_call<5>(hook.address() + 0x10, ToggleFreeCameraMode); // TBD: 0x10 is not the correct offset!!
+            _ToggleFreeCameraMode = trampoline.write_branch<5>(hook.address(), ToggleFreeCameraMode); // TBD: 0x10 is not the correct offset!!
         }
 
     private:
