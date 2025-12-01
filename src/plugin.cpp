@@ -1,6 +1,8 @@
 #include "_ts_SKSEFunctions.h"
 #include "Hooks.h"
 #include "ControlsManager.h"
+#include "APIManager.h"
+#include "TargetReticleManager.h"
 
 namespace FCSE {
     namespace Interface {
@@ -21,21 +23,26 @@ void MessageHandler(SKSE::MessagingInterface::Message* a_msg)
 	// Try requesting APIs at multiple steps to try to work around the SKSE messaging bug
 	switch (a_msg->type) {
 	case SKSE::MessagingInterface::kDataLoaded:
+		APIs::RequestAPIs();
 		break;
 	case SKSE::MessagingInterface::kPostLoad:
+		APIs::RequestAPIs();
 		break;
 	case SKSE::MessagingInterface::kPostPostLoad:
+		APIs::RequestAPIs();
 		break;
 	case SKSE::MessagingInterface::kPreLoadGame:
 		break;
 	case SKSE::MessagingInterface::kPostLoadGame:
-     if (auto input = RE::BSInputDeviceManager::GetSingleton()) {
-        log::info("FCSE - {}: BSInputDeviceManager available", __func__);
-        input->AddEventSink(&FCSE::ControlsManager::GetSingleton());
-    } else {
-        log::warn("FCSE - {}: BSInputDeviceManager not available", __func__);
-    }   
 	case SKSE::MessagingInterface::kNewGame:
+		APIs::RequestAPIs();
+        if (auto input = RE::BSInputDeviceManager::GetSingleton()) {
+            log::info("FCSE - {}: BSInputDeviceManager available", __func__);
+            input->AddEventSink(&FCSE::ControlsManager::GetSingleton());
+        } else {
+                log::warn("FCSE - {}: BSInputDeviceManager not available", __func__);
+        }   
+        FCSE::TargetReticleManager::GetSingleton().Initialize();
 		break;
 	}
 }

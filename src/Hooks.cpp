@@ -1,6 +1,7 @@
 #include "Hooks.h"
 #include "_ts_SKSEFunctions.h"
 #include "FreeCameraManager.h"
+#include "TargetReticleManager.h"
 
 namespace Hooks
 {
@@ -8,11 +9,19 @@ namespace Hooks
 	{
 		log::info("Hooking...");
 
+		MainUpdateHook::Hook();
 		LookHook::Hook();
 		FreeCameraStateHook::Hook();
 //        PlayerCameraHook::Hook();
 
 		log::info("...success");
+	}
+
+	void MainUpdateHook::Nullsub()
+	{
+		_Nullsub();
+
+		FCSE::TargetReticleManager::GetSingleton().Update();
 	}
 
 	void FreeCameraStateHook::OnEnterState(RE::FreeCameraState* a_this)

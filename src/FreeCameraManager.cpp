@@ -1,4 +1,5 @@
 #include "FreeCameraManager.h"
+#include "TargetReticleManager.h"
 #include "_ts_SKSEFunctions.h"
 #include "Offsets.h"
 
@@ -20,6 +21,39 @@ namespace FCSE {
             TransitionToTarget();
         } else {
             UpdateFreeCamera();
+        }
+    }
+
+    void FreeCameraManager::SelectTarget() {
+        if (m_isFreeCameraActive) {
+            return;
+        }
+
+        TargetReticleManager::GetSingleton().ToggleLockReticle();
+    }
+
+    void FreeCameraManager::ToggleFreeCamera() {
+        auto* playerCamera = RE::PlayerCamera::GetSingleton();
+        if (!playerCamera) {
+            return;
+        }
+
+        bool isInFreeCameraMode = playerCamera->IsInFreeCameraMode();
+        if (isInFreeCameraMode && !m_isFreeCameraActive) {
+            // FreeCamera activated via console command
+            SetActive(false);
+            return;
+        }
+
+        if (!TargetReticleManager::GetSingleton().GetCurrentTarget()) {
+            SetActive(false);
+            return;
+        }
+
+        if (isInFreeCameraMode) {
+            StopFreeCameraMode();
+        } else {
+            StartFreeCameraMode();
         }
     }
 
@@ -60,31 +94,36 @@ namespace FCSE {
         m_transitionMode = FreeCameraTransitionMode::kToPrevious;
     }
 
-    void FreeCameraManager::FindTarget() {
-        m_target = _ts_SKSEFunctions::FindClosestActorInCameraDirection(50.f, 8000.f, false);
-
-log::info("FCSE - {}: Target found: {}", __func__, m_target ? m_target->GetName() : "None");
-    }
-
     void FreeCameraManager::TransitionToTarget() {
         if (m_transitionMode != FreeCameraTransitionMode::kToTarget) {
             return;
         }
 
-        if (!m_target) {
+        auto& targetReticleManager = FCSE::TargetReticleManager::GetSingleton();
+        auto* target = targetReticleManager.GetCurrentTarget();
+        if (!target) {
             log::warn("FCSE - {}: No target to transition to", __func__);
             return;
         }
 
-        auto targetPoint = GetTargetPoint(m_target);
+        auto targetPoint = targetReticleManager.GetTargetPoint(target);
         if (targetPoint) {
-            RE::BSTPoint2<float> targetRotation{0.0f, m_target->GetHeading(false)};
+            RE::BSTPoint2<float> targetRotation{0.0f, target->GetHeading(false)};
             float fMinTime = 0.5f; // 0.5secs
             float fMaxTime = 2.0f; // 2.0secs
             float transitionTime = ComputeTransitionTime(2000.f, 20000.f, fMinTime, fMaxTime); // between fMinTime and fMaxTime seconds
             float rotationToMovement_End = 0.5f * fMinTime / transitionTime; // The time the camera finishes rotating towards the movement direction, normalized to [0,1]
             float rotationToTarget_Start = 1.0f - rotationToMovement_End; // the time the camera starts rotating towards the target, normalized to [0,1]
-            TransitionTo(targetPoint->world.translate, targetRotation, transitionTime, rotationToMovement_End, rotationToTarget_Start);
+
+            RE::NiPoint3 targetPos = targetPoint->world.translate;
+            
+            float heading = target->GetHeading(false);
+            targetPos.x += 30.0f*std::sin(heading);
+            targetPos.y += 30.0f*std::cos(heading);
+
+            TargetReticleManager::GetSingleton().SetReticleMode(TargetReticleManager::ReticleMode::kOff);
+
+            TransitionTo(targetPos, targetRotation, transitionTime, rotationToMovement_End, rotationToTarget_Start);
             m_yawOffset = 0.0f;
         }
     }
@@ -101,12 +140,15 @@ log::info("FCSE - {}: Target found: {}", __func__, m_target ? m_target->GetName(
     }
 
     float FreeCameraManager::ComputeTransitionTime(float a_minDist, float a_maxDist, float a_minTime, float a_maxTime) {
-        if (!m_target) {
+
+        auto* target = TargetReticleManager::GetSingleton().GetCurrentTarget();
+
+        if (!target) {
             log::warn("FCSE - {}: No target to compute transition time to", __func__);
             return 1.0f;
         }
 
-        float distance = _ts_SKSEFunctions::GetCameraPos().GetDistance(m_target->GetPosition());
+        float distance = _ts_SKSEFunctions::GetCameraPos().GetDistance(target->GetPosition());
 
         float relDistance = (distance - a_minDist) / (a_maxDist - a_minDist);
         relDistance = std::clamp(relDistance, 0.0f, 1.0f);
@@ -117,7 +159,10 @@ log::info("FCSE - {}: Target found: {}", __func__, m_target ? m_target->GetName(
     }
     
     void FreeCameraManager::UpdateFreeCamera() {
-        if (!m_target) {
+
+        auto& targetReticleManager = FCSE::TargetReticleManager::GetSingleton();
+        auto* target = targetReticleManager.GetCurrentTarget();
+        if (!target) {
             log::warn("FCSE - {}: No target to transition to", __func__);
             return;
         }
@@ -128,10 +173,10 @@ log::info("FCSE - {}: Target found: {}", __func__, m_target ? m_target->GetName(
 			return;
 		}
 
-        float heading = m_target->GetHeading(false);
+        float heading = target->GetHeading(false);
 
-        RE::NiPoint3 position = m_target->GetPosition();
-        auto targetPoint = GetTargetPoint(m_target);
+        RE::NiPoint3 position = target->GetPosition();
+        auto targetPoint = targetReticleManager.GetTargetPoint(target);
         if (targetPoint) {
             RE::NiPoint3 targetWorldPos = targetPoint->world.translate;
         
@@ -205,7 +250,7 @@ log::info("FCSE - {}: Target found: {}", __func__, m_target ? m_target->GetName(
                             }
                         }
                     }
-
+                    TargetReticleManager::GetSingleton().SetReticleMode(TargetReticleManager::ReticleMode::kOn);
                 } else {
                     log::error("FCSE - {}: PlayerCamera singleton not found", __func__);
                 }
@@ -289,31 +334,6 @@ log::info("FCSE - {}: Target found: {}", __func__, m_target ? m_target->GetName(
         return angleStep;
     }
 
-    void FreeCameraManager::ToggleFreeCamera() {
-        auto* playerCamera = RE::PlayerCamera::GetSingleton();
-        if (!playerCamera) {
-            return;
-        }
-
-        bool isInFreeCameraMode = playerCamera->IsInFreeCameraMode();
-        if (isInFreeCameraMode && !m_isFreeCameraActive) {
-            // FreeCamera activated via console command
-            SetActive(false);
-            return;
-        }
-
-        if (!m_target) {
-            SetActive(false);
-            return;
-        }
-
-        if (isInFreeCameraMode) {
-            StopFreeCameraMode();
-        } else {
-            StartFreeCameraMode();
-        }
-    }
-
     void FreeCameraManager::SetActive(bool a_activate) {
         m_isFreeCameraActive = a_activate;
         m_percentageTransitioned = 0.0f;
@@ -355,38 +375,5 @@ log::info("FCSE - {}: Target found: {}", __func__, m_target ? m_target->GetName(
             freeCameraState = static_cast<RE::FreeCameraState*>(playerCamera->currentState.get());
         }
         return freeCameraState;
-    }
-
-    RE::NiPointer<RE::NiAVObject> FreeCameraManager::GetTargetPoint(RE::Actor* a_actor) const {
-        RE::NiPointer<RE::NiAVObject> targetPoint = nullptr;
-
-        if (!a_actor) {
-            return nullptr;
-        }
-
-        auto race = a_actor->GetRace();
-        if (!race) {
-            return nullptr;
-        }
-
-        RE::BGSBodyPartData* bodyPartData = race->bodyPartData;
-        if (!bodyPartData) {
-            return nullptr;
-        }
-
-        auto actor3D = a_actor->Get3D2();
-        if (!actor3D) {
-            return nullptr;
-        }
-    
-        RE::BGSBodyPart* bodyPart = bodyPartData->parts[RE::BGSBodyPartDefs::LIMB_ENUM::kHead];
-        if (!bodyPart) {
-            bodyPart = bodyPartData->parts[RE::BGSBodyPartDefs::LIMB_ENUM::kTotal];
-        }
-        if (bodyPart) {
-            targetPoint = RE::NiPointer<RE::NiAVObject>(NiAVObject_LookupBoneNodeByName(actor3D, bodyPart->targetName, true));
-        }
-
-        return targetPoint;
     }
 } // namespace FCSE

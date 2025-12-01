@@ -17,7 +17,7 @@ namespace FCSE {
 
             void Update();
 
-            void FindTarget();
+            void SelectTarget();
 
             void ToggleFreeCamera();
 
@@ -52,8 +52,6 @@ namespace FCSE {
                 RE::BSTPoint2<float>& a_currentRotation, RE::BSTPoint2<float>& a_targetRotation,
                 float a_rotationToMovement_End, float a_rotationToTarget_Start);
 
-            RE::NiPointer<RE::NiAVObject> GetTargetPoint(RE::Actor* a_actor) const;
-            
             RE::FreeCameraState* GetFreeCameraState() const;
 
             float ComputeAngleStep(float a_transitionDelta, float a_rotationStart, float a_rotationEnd, float a_currentAngle, float a_targetAngle);
@@ -63,7 +61,6 @@ namespace FCSE {
             void StopFreeCameraMode();
 
             // members
-            RE::Actor* m_target = nullptr;
             RE::CameraState m_previousCameraState;
             RE::NiPoint3 m_previousCameraPos;
             RE::NiPoint2 m_prevFreeRotation;

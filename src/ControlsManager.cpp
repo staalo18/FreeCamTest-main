@@ -18,7 +18,7 @@ namespace FCSE {
                 
                 const uint32_t key = buttonEvent->GetIDCode();
                 if (key == 2) {
-                    FCSE::FreeCameraManager::GetSingleton().FindTarget();
+                    FCSE::FreeCameraManager::GetSingleton().SelectTarget();
                 } else if (key == 3) {
                     FCSE::FreeCameraManager::GetSingleton().ToggleFreeCamera();
                 }
