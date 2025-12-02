@@ -2,6 +2,7 @@
 #include "TargetReticleManager.h"
 #include "_ts_SKSEFunctions.h"
 #include "Offsets.h"
+#include "APIManager.h"
 
 namespace FCSE {
 
@@ -25,7 +26,7 @@ namespace FCSE {
     }
 
     void FreeCameraManager::SelectTarget() {
-        if (m_isFreeCameraActive) {
+        if (m_isFreeCameraActive || !APIs::TrueHUD) {
             return;
         }
 
@@ -45,7 +46,17 @@ namespace FCSE {
             return;
         }
 
-        if (!TargetReticleManager::GetSingleton().GetCurrentTarget()) {
+        if (!isInFreeCameraMode) {
+            if (APIs::TrueHUD) {
+                // use target from reticle
+                m_target = TargetReticleManager::GetSingleton().GetCurrentTarget();
+            } else  {
+                // use currently selected target
+                m_target = TargetReticleManager::GetSingleton().GetSelectedActor();
+            }
+        } 
+
+        if (!m_target) {
             SetActive(false);
             return;
         }
@@ -100,15 +111,14 @@ namespace FCSE {
         }
 
         auto& targetReticleManager = FCSE::TargetReticleManager::GetSingleton();
-        auto* target = targetReticleManager.GetCurrentTarget();
-        if (!target) {
+        if (!m_target) {
             log::warn("FCSE - {}: No target to transition to", __func__);
             return;
         }
 
-        auto targetPoint = targetReticleManager.GetTargetPoint(target);
+        auto targetPoint = targetReticleManager.GetTargetPoint(m_target);
         if (targetPoint) {
-            RE::BSTPoint2<float> targetRotation{0.0f, target->GetHeading(false)};
+            RE::BSTPoint2<float> targetRotation{0.0f, m_target->GetHeading(false)};
             float fMinTime = 0.5f; // 0.5secs
             float fMaxTime = 2.0f; // 2.0secs
             float transitionTime = ComputeTransitionTime(2000.f, 20000.f, fMinTime, fMaxTime); // between fMinTime and fMaxTime seconds
@@ -117,7 +127,7 @@ namespace FCSE {
 
             RE::NiPoint3 targetPos = targetPoint->world.translate;
             
-            float heading = target->GetHeading(false);
+            float heading = m_target->GetHeading(false);
             targetPos.x += 30.0f*std::sin(heading);
             targetPos.y += 30.0f*std::cos(heading);
 
@@ -133,6 +143,8 @@ namespace FCSE {
             return;
         }
 
+        TargetReticleManager::GetSingleton().SetReticleMode(TargetReticleManager::ReticleMode::kOn);
+
         RE::BSTPoint2<float> previousRotation{-m_prevPitch, m_prevYaw};
         float transitionTime = ComputeTransitionTime(2000.f, 20000.f, 0.5f, 2.0f);
         TransitionTo(m_previousCameraPos, previousRotation, transitionTime, 0.0f, 0.0f);
@@ -140,15 +152,12 @@ namespace FCSE {
     }
 
     float FreeCameraManager::ComputeTransitionTime(float a_minDist, float a_maxDist, float a_minTime, float a_maxTime) {
-
-        auto* target = TargetReticleManager::GetSingleton().GetCurrentTarget();
-
-        if (!target) {
+        if (!m_target) {
             log::warn("FCSE - {}: No target to compute transition time to", __func__);
             return 1.0f;
         }
 
-        float distance = _ts_SKSEFunctions::GetCameraPos().GetDistance(target->GetPosition());
+        float distance = _ts_SKSEFunctions::GetCameraPos().GetDistance(m_target->GetPosition());
 
         float relDistance = (distance - a_minDist) / (a_maxDist - a_minDist);
         relDistance = std::clamp(relDistance, 0.0f, 1.0f);
@@ -161,8 +170,7 @@ namespace FCSE {
     void FreeCameraManager::UpdateFreeCamera() {
 
         auto& targetReticleManager = FCSE::TargetReticleManager::GetSingleton();
-        auto* target = targetReticleManager.GetCurrentTarget();
-        if (!target) {
+        if (!m_target) {
             log::warn("FCSE - {}: No target to transition to", __func__);
             return;
         }
@@ -173,10 +181,10 @@ namespace FCSE {
 			return;
 		}
 
-        float heading = target->GetHeading(false);
+        float heading = m_target->GetHeading(false);
 
-        RE::NiPoint3 position = target->GetPosition();
-        auto targetPoint = targetReticleManager.GetTargetPoint(target);
+        RE::NiPoint3 position = m_target->GetPosition();
+        auto targetPoint = targetReticleManager.GetTargetPoint(m_target);
         if (targetPoint) {
             RE::NiPoint3 targetWorldPos = targetPoint->world.translate;
         
@@ -202,7 +210,13 @@ namespace FCSE {
             relativeYaw = std::clamp(relativeYaw, -0.5f * PI, 0.5f * PI);
             freeCameraState->rotation.y = _ts_SKSEFunctions::NormalRelativeAngle(heading + relativeYaw);
         } else {
-            log::warn("FCSE - {}: No target point found", __func__);
+            log::info("FCSE - {}: Lost target - stopping free camera", __func__);
+
+            if (targetReticleManager.IsReticleLocked()) {
+                targetReticleManager.ToggleLockReticle();
+            }
+
+            StopFreeCameraMode();
         }
     }
 
@@ -226,6 +240,7 @@ namespace FCSE {
         m_percentageTransitioned += transitionDelta;
 
         if (m_percentageTransitioned >= 1.0f) {
+            // transition completed
             m_percentageTransitioned = 0.0f;
             freeCameraState->translation = a_targetPos;
             freeCameraState->rotation.x = a_targetRotation.x; // pitch
@@ -236,7 +251,7 @@ namespace FCSE {
                 if (playerCamera) {
                     m_isFreeCameraToggled = true;
                     playerCamera->ToggleFreeCameraMode(false);
-
+                    m_target = nullptr;
                     
                     if (playerCamera->currentState && playerCamera->currentState->id == m_previousCameraState) {
                         RE::ThirdPersonState* thirdPersonState = nullptr;
@@ -250,7 +265,6 @@ namespace FCSE {
                             }
                         }
                     }
-                    TargetReticleManager::GetSingleton().SetReticleMode(TargetReticleManager::ReticleMode::kOn);
                 } else {
                     log::error("FCSE - {}: PlayerCamera singleton not found", __func__);
                 }
@@ -354,10 +368,6 @@ namespace FCSE {
 
     void FreeCameraManager::SetFreeCameraToggled(bool a_toggled) {
         m_isFreeCameraToggled = a_toggled;
-    }
-
-    bool FreeCameraManager::IsCameraLocked() {
-        return m_cameraLocked;
     }
 
     void FreeCameraManager::SetUserTurning(bool a_turning) {

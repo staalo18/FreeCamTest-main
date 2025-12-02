@@ -35,8 +35,10 @@ namespace FCSE {
 
             void DisposeReticle(bool a_keepTarget = false);
 
-            RE::Actor* GetCurrentTarget() const;
+            RE::Actor* GetCurrentTarget();
 
+            RE::Actor* GetSelectedActor() const;
+            
             bool IsReticleLocked () const;
 
             RE::NiPointer<RE::NiAVObject> GetTargetPoint(RE::Actor* a_actor) const;
@@ -45,8 +47,6 @@ namespace FCSE {
             TargetReticleManager() = default;
 
             void UpdateReticleState();
-
-            RE::Actor* GetSelectedActor() const;
 
             void SetReticleTarget();
 

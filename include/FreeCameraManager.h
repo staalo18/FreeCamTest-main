@@ -25,8 +25,6 @@ namespace FCSE {
 
             bool IsActive() const;
 
-            bool IsCameraLocked();
-
             void SetUserTurning(bool a_turning);
 
             bool GetFreeCameraToggled() const;
@@ -64,12 +62,12 @@ namespace FCSE {
             RE::CameraState m_previousCameraState;
             RE::NiPoint3 m_previousCameraPos;
             RE::NiPoint2 m_prevFreeRotation;
+            RE::Actor* m_target = nullptr;
             float m_prevYaw= 0.0f;
             float m_prevPitch = 0.0f;
             bool m_isFreeCameraActive = false;
             bool m_isFreeCameraToggled = false;
             float m_yawOffset = 0.0f;
-            bool m_cameraLocked = false;
             bool m_userTurning = false;
 
             float m_percentageTransitioned = 0.0f;

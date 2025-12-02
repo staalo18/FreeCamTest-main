@@ -69,7 +69,7 @@ namespace FCSE {
         RE::Actor* newTarget = nullptr;
 
         RE::Actor* player = RE::PlayerCharacter::GetSingleton();
-        if (m_isReticleLocked && m_reticleTarget->GetDistance(player) > m_maxReticleDistance * GetDistanceRaceSizeMultiplier(m_reticleTarget->GetRace())) {
+        if (m_isReticleLocked && m_reticleTarget && m_reticleTarget->GetDistance(player) > m_maxReticleDistance * GetDistanceRaceSizeMultiplier(m_reticleTarget->GetRace())) {
             ToggleLockReticle();
             m_reticleTarget = nullptr;
         }
@@ -88,9 +88,9 @@ namespace FCSE {
     }
 
 
-    RE::Actor* TargetReticleManager::GetCurrentTarget() const {
+    RE::Actor* TargetReticleManager::GetCurrentTarget() {
         if (!IsReticleLocked()) {
-            return nullptr;
+            return GetSelectedActor();
         }
         return m_reticleTarget; 
     }
@@ -170,10 +170,10 @@ namespace FCSE {
 
         if (m_reticleTarget || m_isReticleLocked) {
             m_isReticleLocked = !m_isReticleLocked;
-            std::string sMessage = "Target reticle " + std::string(m_isReticleLocked ? "locked on " + std::string(m_reticleTarget->GetName()) + "." : "unlocked.");
+            std::string sMessage = "Zoom " + std::string(m_isReticleLocked ? "locked on " + std::string(m_reticleTarget->GetName()) + "." : "unlocked.");
             RE::DebugNotification(sMessage.c_str());
         } else {
-            std::string sMessage = "No target to lock target reticle on.";
+            std::string sMessage = "No zoom target to lock on.";
             RE::DebugNotification(sMessage.c_str());
         }
 
